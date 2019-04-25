@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-xorm/xorm"
+	_ "github.com/jinzhu/gorm/dialects/mysql"
 	"io/ioutil"
 	"time"
 )
@@ -34,14 +35,20 @@ func main() {
 	if err := json.Unmarshal(configContent, &ConfigInfo); err != nil {
 		panic(err)
 	}
-	fmt.Printf("%+v", ConfigInfo["live-update"])
+	fmt.Printf("%+v\n", ConfigInfo["live-update"])
+	for k, v := range ConfigInfo {
+		eng := conn(k, v)
+		for _,table:=range v.Tables{
+			desc(eng, table)
+		}
+	}
 }
 
-func setDsn(dbName string,cs ConfigStruct)string{
+func setDsn(dbName string, cs ConfigStruct) string {
 	return fmt.Sprintf(MySQLDsn, cs.User, cs.Password, cs.Url, dbName)
 }
 
-func conn(dbName string,cs ConfigStruct)(*xorm.Engine){
+func conn(dbName string, cs ConfigStruct) *xorm.Engine {
 	eng, err := xorm.NewEngine("mysql", setDsn(dbName, cs))
 	if err != nil {
 		panic(err)
@@ -50,15 +57,19 @@ func conn(dbName string,cs ConfigStruct)(*xorm.Engine){
 		panic(err)
 	}
 	// 打开调试模式
-	eng.ShowSQL(false)
+	eng.ShowSQL(true)
 	eng.SetMaxOpenConns(10)
 	eng.SetMaxIdleConns(10)
 	eng.SetConnMaxLifetime(time.Second * time.Duration(1200))
 	return eng
 }
 
-func desc(eng *xorm.Engine, table string){
-	sql := "DESC ?"
-	eng.SQL(sql,table)
+func desc(eng *xorm.Engine, table string) {
+	sql := fmt.Sprintf("DESC `%s`", table)
+	descInfo := make([]interface{},0)
+	if err := eng.SQL(sql).Find(&descInfo); err != nil {
+		panic(err)
+	}
+	fmt.Println(descInfo)
 
 }
